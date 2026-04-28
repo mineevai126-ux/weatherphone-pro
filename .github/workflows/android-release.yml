@@ -2,6 +2,7 @@ name: Android Release Build
 
 on:
   push:
+    branches: [ main ]
     tags:
       - 'v*'
   workflow_dispatch:
@@ -75,7 +76,8 @@ jobs:
 
             Includes:
             - MAX launcher screen
-            - multi-source forecast comparison
+            - reliable multi-source forecast comparison
+            - Open-Meteo Best Match, GFS, ICON, ECMWF IFS, UKMO, MET Norway
             - confidence and risk UI
             - scenarios and action cards
             - rain map preview
