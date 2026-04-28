@@ -1,0 +1,87 @@
+name: Android Release Build
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Set up Gradle 8.7
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Build debug APK
+        run: gradle assembleDebug --stacktrace
+
+      - name: Build unsigned release APK
+        run: gradle assembleRelease --stacktrace
+
+      - name: Build release AAB
+        run: gradle bundleRelease --stacktrace
+
+      - name: Prepare release files
+        run: |
+          mkdir -p release-files
+          cp app/build/outputs/apk/debug/app-debug.apk release-files/serz-max-debug.apk
+          cp app/build/outputs/apk/release/app-release-unsigned.apk release-files/serz-max-release-unsigned.apk
+          cp app/build/outputs/bundle/release/app-release.aab release-files/serz-max-release.aab
+          cat > release-files/README-release.txt <<'TXT'
+          Суперпрогноз от Serz — MAX release package
+
+          Files:
+          - serz-max-debug.apk — installable debug APK for phone testing.
+          - serz-max-release-unsigned.apk — unsigned release APK. It must be signed before public distribution.
+          - serz-max-release.aab — release Android App Bundle. It must be signed/configured for store publication.
+
+          Notes:
+          - For Google Play / RuStore publication, create a keystore and signed release build.
+          - Debug APK is easiest for direct Android installation.
+          TXT
+
+      - name: Upload release package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: serz-max-release-package
+          path: release-files/*
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Суперпрогноз от Serz MAX ${{ github.ref_name }}
+          body: |
+            Суперпрогноз от Serz MAX.
+
+            Includes:
+            - MAX launcher screen
+            - multi-source forecast comparison
+            - confidence and risk UI
+            - scenarios and action cards
+            - rain map preview
+            - Android widget
+            - final mobile layout polish
+
+            Direct install: use serz-max-debug.apk.
+            Store release: sign release APK/AAB before publication.
+          files: release-files/*
