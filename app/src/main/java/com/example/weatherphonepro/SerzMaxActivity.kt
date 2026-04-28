@@ -93,7 +93,7 @@ fun SerzMaxConnectedApp() {
                 scope.launch {
                     loading = true
                     error = null
-                    try { setDashboard(fetchSerzDashboardByCity(context, city.trim())) }
+                    try { setDashboard(fetchSerzDashboardByCityReliable(context, city.trim())) }
                     catch (e: Exception) { data = null; error = e.message ?: "Не удалось загрузить прогноз" }
                     finally { loading = false }
                 }
@@ -117,7 +117,7 @@ fun SerzMaxConnectedApp() {
                     loading = true
                     error = null
                     try {
-                        setDashboard(fetchSerzDashboardByPoint(context, "Моя точка", "GPS", location.latitude, location.longitude, "геолокация телефона"))
+                        setDashboard(fetchSerzDashboardByPointReliable(context, "Моя точка", "GPS", location.latitude, location.longitude, "геолокация телефона"))
                         city = "Моя точка"
                     } catch (e: Exception) {
                         data = null
@@ -209,7 +209,7 @@ fun SerzMaxHeader() {
         WeatherIconVector(1, modifier = Modifier.size(38.dp))
         Column(modifier = Modifier.padding(start = 10.dp)) {
             Text("Суперпрогноз от Serz", color = Color.White, fontSize = 27.sp, fontWeight = FontWeight.ExtraBold, maxLines = 2, lineHeight = 28.sp)
-            Text("MAX · риски · точность · радар · виджет", color = Color.White.copy(alpha = 0.74f), fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text("MAX · 6+ источников · точность · радар", color = Color.White.copy(alpha = 0.74f), fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }
@@ -269,7 +269,7 @@ fun SerzCompactHeroCard(data: WeatherResult) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text("${data.city}, ${data.country}", color = Color.White, fontSize = 25.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(data.current.description, color = Color.White.copy(alpha = 0.80f), fontSize = 17.sp, maxLines = 1)
-                    Text("${data.consensus.providerCount} источника · точность ${data.consensus.confidence}%", color = Color.White.copy(alpha = 0.62f), fontSize = 12.sp, maxLines = 1)
+                    Text("${data.consensus.providerCount} источников · точность ${data.consensus.confidence}%", color = Color.White.copy(alpha = 0.62f), fontSize = 12.sp, maxLines = 1)
                 }
                 WeatherIconVector(data.current.code, modifier = Modifier.size(72.dp))
             }
