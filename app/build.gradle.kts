@@ -12,8 +12,8 @@ android {
         applicationId = "com.example.weatherphonepro"
         minSdk = 26
         targetSdk = 35
-        versionCode = 2
-        versionName = "2.0"
+        versionCode = 100
+        versionName = "1.0.0-serz-max"
     }
 
     compileOptions {
@@ -27,6 +27,18 @@ android {
 
     buildFeatures {
         compose = true
+    }
+
+    buildTypes {
+        debug {
+            isDebuggable = true
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
+        }
+        release {
+            isMinifyEnabled = false
+            isShrinkResources = false
+        }
     }
 }
 
