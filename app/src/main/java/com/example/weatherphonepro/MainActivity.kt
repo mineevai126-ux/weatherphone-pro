@@ -62,13 +62,14 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import kotlin.math.max
 import kotlin.math.roundToInt
 import kotlin.math.sin
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent { WeatherPhoneProApp() }
+        setContent { SuperForecastApp() }
     }
 }
 
@@ -79,6 +80,7 @@ data class WeatherResult(
     val hourly: List<HourlyWeather>,
     val daily: List<DailyWeather>,
     val air: AirQuality?,
+    val consensus: ForecastConsensus,
     val advice: String
 )
 
@@ -103,7 +105,12 @@ data class HourlyWeather(
     val time: String,
     val temp: Int,
     val rain: Int,
+    val precipitation: Double,
+    val pressure: Int,
+    val humidity: Int,
+    val clouds: Int,
     val wind: Int,
+    val gusts: Int,
     val icon: String
 )
 
@@ -123,8 +130,27 @@ data class DailyWeather(
 
 data class AirQuality(val aqi: Int, val pm10: Double, val pm25: Double)
 
+data class ProviderForecast(
+    val name: String,
+    val currentTemp: Int,
+    val nextRainRisk: Int,
+    val nextWindGust: Int,
+    val nextPressure: Int,
+    val hourly: List<HourlyWeather>
+)
+
+data class ForecastConsensus(
+    val confidence: Int,
+    val providerCount: Int,
+    val providerNames: String,
+    val rainRisk: String,
+    val rainWindow: String,
+    val agreement: String,
+    val explanation: String
+)
+
 @Composable
-fun WeatherPhoneProApp() {
+fun SuperForecastApp() {
     MaterialTheme {
         Surface(modifier = Modifier.fillMaxSize(), color = Color(0xFF07111F)) {
             var city by remember { mutableStateOf("Омск") }
@@ -141,14 +167,9 @@ fun WeatherPhoneProApp() {
                 scope.launch {
                     loading = true
                     error = null
-                    try {
-                        data = fetchWeather(city.trim())
-                    } catch (e: Exception) {
-                        data = null
-                        error = e.message ?: "Не удалось загрузить прогноз"
-                    } finally {
-                        loading = false
-                    }
+                    try { data = fetchWeather(city.trim()) }
+                    catch (e: Exception) { data = null; error = e.message ?: "Не удалось загрузить прогноз" }
+                    finally { loading = false }
                 }
             }
 
@@ -156,6 +177,13 @@ fun WeatherPhoneProApp() {
 
             Box(modifier = Modifier.fillMaxSize()) {
                 AnimatedWeatherBackground(data?.current?.code ?: 1, data?.current?.isDay ?: true)
+                Text(
+                    text = "Serz",
+                    color = Color.White.copy(alpha = 0.10f),
+                    fontSize = 90.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    modifier = Modifier.align(Alignment.Center)
+                )
                 LazyColumn(
                     modifier = Modifier.fillMaxSize().padding(18.dp),
                     verticalArrangement = Arrangement.spacedBy(14.dp)
@@ -166,13 +194,14 @@ fun WeatherPhoneProApp() {
                     error?.let { item { ErrorCard(it) } }
                     data?.let { weather ->
                         item { HeroCard(weather) }
+                        item { AccuracyCard(weather.consensus) }
                         item { AdviceCard(weather.advice) }
                         item { MetricsGrid(weather) }
                         item { SectionTitle("Почасовой прогноз") }
                         item { HourlyRow(weather.hourly.take(24)) }
                         item { SectionTitle("Прогноз на 7 дней") }
                         items(weather.daily) { DailyCard(it) }
-                        item { Spacer(modifier = Modifier.height(24.dp)) }
+                        item { FooterWatermark() }
                     }
                 }
             }
@@ -183,8 +212,8 @@ fun WeatherPhoneProApp() {
 @Composable
 fun Header() {
     Column {
-        Text("WeatherPhone Pro", color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.ExtraBold)
-        Text("точный прогноз, параметры, предупреждения", color = Color.White.copy(alpha = 0.72f), fontSize = 15.sp)
+        Text("Суперпрогноз от Serz", color = Color.White, fontSize = 32.sp, fontWeight = FontWeight.ExtraBold)
+        Text("мульти-источник · расчёт доверия · риск осадков", color = Color.White.copy(alpha = 0.72f), fontSize = 14.sp)
     }
 }
 
@@ -206,7 +235,7 @@ fun LoadingCard() = GlassCard {
     Row(verticalAlignment = Alignment.CenterVertically) {
         CircularProgressIndicator(modifier = Modifier.size(28.dp), color = Color.White)
         Spacer(Modifier.width(12.dp))
-        Text("Загружаю расширенный прогноз...", color = Color.White)
+        Text("Сравниваю погодные источники...", color = Color.White)
     }
 }
 
@@ -222,6 +251,7 @@ fun HeroCard(data: WeatherResult) = GlassCard {
             Column(modifier = Modifier.weight(1f)) {
                 Text("${data.city}, ${data.country}", color = Color.White, fontSize = 25.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(data.current.description, color = Color.White.copy(alpha = 0.78f), fontSize = 18.sp)
+                Text("источники: ${data.consensus.providerNames}", color = Color.White.copy(alpha = 0.58f), fontSize = 12.sp)
             }
             Text(data.current.icon, fontSize = 54.sp)
         }
@@ -238,9 +268,26 @@ fun HeroCard(data: WeatherResult) = GlassCard {
 }
 
 @Composable
+fun AccuracyCard(consensus: ForecastConsensus) = Card(
+    modifier = Modifier.fillMaxWidth(),
+    shape = RoundedCornerShape(26.dp),
+    colors = CardDefaults.cardColors(containerColor = Color(0xFFEFF6FF).copy(alpha = 0.96f))
+) {
+    Column(modifier = Modifier.padding(18.dp)) {
+        Text("Точность прогноза", color = Color(0xFF0F3B66), fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
+        Spacer(Modifier.height(8.dp))
+        Text("Надёжность: ${consensus.confidence}% · ${consensus.agreement}", color = Color(0xFF123A5A), fontSize = 17.sp, fontWeight = FontWeight.Bold)
+        Text("Риск осадков: ${consensus.rainRisk}", color = Color(0xFF123A5A), fontSize = 15.sp)
+        Text("Окно риска: ${consensus.rainWindow}", color = Color(0xFF123A5A), fontSize = 15.sp)
+        Spacer(Modifier.height(7.dp))
+        Text(consensus.explanation, color = Color(0xFF16486E), fontSize = 14.sp, lineHeight = 20.sp)
+    }
+}
+
+@Composable
 fun AdviceCard(text: String) = Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(26.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFFECFDF5).copy(alpha = 0.95f))) {
     Column(modifier = Modifier.padding(18.dp)) {
-        Text("Умный совет", color = Color(0xFF065F46), fontSize = 18.sp, fontWeight = FontWeight.Bold)
+        Text("Совет Serz", color = Color(0xFF065F46), fontSize = 18.sp, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(6.dp))
         Text(text, color = Color(0xFF064E3B), fontSize = 15.sp, lineHeight = 21.sp)
     }
@@ -273,12 +320,12 @@ fun SectionTitle(text: String) = Text(text, color = Color.White, fontSize = 21.s
 fun HourlyRow(hours: List<HourlyWeather>) = LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) { items(hours) { HourlyCard(it) } }
 
 @Composable
-fun HourlyCard(hour: HourlyWeather) = Card(modifier = Modifier.width(105.dp), shape = RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.16f))) {
+fun HourlyCard(hour: HourlyWeather) = Card(modifier = Modifier.width(108.dp), shape = RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.16f))) {
     Column(modifier = Modifier.padding(13.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Text(hour.time, color = Color.White.copy(alpha = 0.80f), fontSize = 13.sp)
         Text(hour.icon, fontSize = 29.sp)
         Text("${hour.temp}°", color = Color.White, fontSize = 25.sp, fontWeight = FontWeight.Bold)
-        Text("${hour.rain}%", color = Color(0xFFBDE7FF), fontSize = 13.sp)
+        Text("риск ${hour.rain}%", color = Color(0xFFBDE7FF), fontSize = 12.sp)
         Text("${hour.wind} км/ч", color = Color.White.copy(alpha = 0.65f), fontSize = 11.sp)
     }
 }
@@ -298,6 +345,11 @@ fun DailyCard(day: DailyWeather) = Card(modifier = Modifier.fillMaxWidth(), shap
         Spacer(Modifier.height(10.dp))
         Text("Осадки ${day.rain}% · ветер ${day.wind} км/ч · порывы ${day.gusts} км/ч · UV ${one(day.uv)} · 🌅 ${day.sunrise} · 🌇 ${day.sunset}", color = Color.White.copy(alpha = 0.75f), fontSize = 12.sp)
     }
+}
+
+@Composable
+fun FooterWatermark() {
+    Text("© Суперпрогноз от Serz", color = Color.White.copy(alpha = 0.55f), fontSize = 13.sp, modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp))
 }
 
 @Composable
@@ -348,10 +400,21 @@ suspend fun fetchWeather(city: String): WeatherResult = withContext(Dispatchers.
     val place = results.getJSONObject(0)
     val lat = place.getDouble("latitude")
     val lon = place.getDouble("longitude")
-    val url = "https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,weather_code,cloud_cover,pressure_msl,wind_speed_10m,wind_direction_10m,wind_gusts_10m&hourly=temperature_2m,precipitation_probability,weather_code,wind_speed_10m,uv_index,visibility&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,wind_speed_10m_max,wind_gusts_10m_max,uv_index_max,sunrise,sunset&timezone=auto&forecast_days=7"
-    val json = JSONObject(download(url))
-    val currentJson = json.getJSONObject("current")
-    val hourlyJson = json.getJSONObject("hourly")
+
+    val mainJson = JSONObject(download(forecastUrl(lat, lon, null)))
+    val currentJson = mainJson.getJSONObject("current")
+    val hourlyJson = mainJson.getJSONObject("hourly")
+
+    val providerForecasts = mutableListOf<ProviderForecast>()
+    providerForecasts += providerFromJson("Open-Meteo", mainJson)
+    listOf("gfs_seamless", "icon_seamless").forEach { model ->
+        try {
+            val modelJson = JSONObject(download(forecastUrl(lat, lon, model)))
+            providerForecasts += providerFromJson(model.uppercase(Locale.US), modelJson)
+        } catch (_: Exception) {
+        }
+    }
+
     val firstUv = hourlyJson.getJSONArray("uv_index").optDouble(0, 0.0)
     val firstVisibility = hourlyJson.getJSONArray("visibility").optDouble(0, 10000.0).roundToInt()
     val code = currentJson.getInt("weather_code")
@@ -373,22 +436,80 @@ suspend fun fetchWeather(city: String): WeatherResult = withContext(Dispatchers.
         icon = info.second
     )
     val hours = buildHours(hourlyJson)
-    val days = buildDays(json.getJSONObject("daily"))
+    val days = buildDays(mainJson.getJSONObject("daily"))
     val air = fetchAir(lat, lon)
-    WeatherResult(place.optString("name", city), place.optString("country", ""), current, hours, days, air, makeAdvice(current, hours, air))
+    val consensus = buildConsensus(providerForecasts, current, hours)
+    WeatherResult(place.optString("name", city), place.optString("country", ""), current, hours, days, air, consensus, makeAdvice(current, hours, air, consensus))
+}
+
+fun forecastUrl(lat: Double, lon: Double, model: String?): String {
+    val modelPart = if (model == null) "" else "&models=$model"
+    return "https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon$modelPart&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,weather_code,cloud_cover,pressure_msl,wind_speed_10m,wind_direction_10m,wind_gusts_10m&hourly=temperature_2m,precipitation_probability,precipitation,weather_code,cloud_cover,pressure_msl,relative_humidity_2m,wind_speed_10m,wind_gusts_10m,uv_index,visibility&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,wind_speed_10m_max,wind_gusts_10m_max,uv_index_max,sunrise,sunset&timezone=auto&forecast_days=7"
+}
+
+fun providerFromJson(name: String, json: JSONObject): ProviderForecast {
+    val c = json.getJSONObject("current")
+    val h = buildHours(json.getJSONObject("hourly"))
+    val next = h.take(12)
+    return ProviderForecast(
+        name = name,
+        currentTemp = c.getDouble("temperature_2m").roundToInt(),
+        nextRainRisk = next.maxOfOrNull { it.rain } ?: 0,
+        nextWindGust = next.maxOfOrNull { it.gusts } ?: 0,
+        nextPressure = next.firstOrNull()?.pressure ?: c.getDouble("pressure_msl").roundToInt(),
+        hourly = h
+    )
+}
+
+fun buildConsensus(providers: List<ProviderForecast>, current: CurrentWeather, hours: List<HourlyWeather>): ForecastConsensus {
+    val safe = providers.ifEmpty { listOf(ProviderForecast("Open-Meteo", current.temp, hours.take(12).maxOfOrNull { it.rain } ?: 0, current.gusts, current.pressure, hours)) }
+    val maxRain = safe.maxOf { it.nextRainRisk }
+    val minRain = safe.minOf { it.nextRainRisk }
+    val tempSpread = safe.maxOf { it.currentTemp } - safe.minOf { it.currentTemp }
+    val rainSpread = maxRain - minRain
+    val agreementScore = max(0, 100 - tempSpread * 8 - rainSpread / 2)
+    val signalScore = if (maxRain >= 70) 10 else if (maxRain >= 40) 0 else 8
+    val pressurePenalty = if (current.pressure < 1000 && current.humidity > 75 && current.clouds > 65) 8 else 0
+    val confidence = (agreementScore + signalScore - pressurePenalty).coerceIn(35, 96)
+    val rainRisk = when { maxRain >= 70 -> "высокий"; maxRain >= 40 -> "средний"; maxRain >= 20 -> "низкий"; else -> "минимальный" }
+    val agreement = when { safe.size == 1 -> "один источник"; confidence >= 80 -> "источники согласны"; confidence >= 60 -> "есть расхождения"; else -> "сильные расхождения" }
+    val explanation = if (safe.size > 1) "Сравниваю ${safe.size} источника. Разброс температуры ${tempSpread}°, разброс риска осадков ${rainSpread}%. Учитываю облачность ${current.clouds}%, влажность ${current.humidity}% и давление ${current.pressure} гПа." else "Пока доступен один источник. Дополнительно учитываю облачность, влажность, давление и порывы ветра."
+    return ForecastConsensus(confidence, safe.size, safe.joinToString { it.name }, rainRisk, riskWindow(hours), agreement, explanation)
+}
+
+fun riskWindow(hours: List<HourlyWeather>): String {
+    val risky = hours.take(24).filter { it.rain >= 40 || it.precipitation > 0.1 }
+    if (risky.isEmpty()) return "не выражено в ближайшие 24 часа"
+    return "${risky.first().time}–${risky.last().time}"
 }
 
 fun buildHours(h: JSONObject): List<HourlyWeather> {
     val times = h.getJSONArray("time")
     val temps = h.getJSONArray("temperature_2m")
     val rains = h.getJSONArray("precipitation_probability")
+    val precipitation = h.getJSONArray("precipitation")
     val codes = h.getJSONArray("weather_code")
     val winds = h.getJSONArray("wind_speed_10m")
+    val gusts = h.getJSONArray("wind_gusts_10m")
+    val pressure = h.getJSONArray("pressure_msl")
+    val humidity = h.getJSONArray("relative_humidity_2m")
+    val clouds = h.getJSONArray("cloud_cover")
     val input = DateTimeFormatter.ISO_LOCAL_DATE_TIME
     val output = DateTimeFormatter.ofPattern("HH:mm", Locale("ru"))
     return (0 until minOf(times.length(), 48)).map { i ->
         val info = weatherCode(codes.getInt(i))
-        HourlyWeather(LocalDateTime.parse(times.getString(i), input).format(output), temps.getDouble(i).roundToInt(), rains.optInt(i, 0), winds.getDouble(i).roundToInt(), info.second)
+        HourlyWeather(
+            time = LocalDateTime.parse(times.getString(i), input).format(output),
+            temp = temps.getDouble(i).roundToInt(),
+            rain = rains.optInt(i, 0),
+            precipitation = precipitation.optDouble(i, 0.0),
+            pressure = pressure.getDouble(i).roundToInt(),
+            humidity = humidity.getInt(i),
+            clouds = clouds.getInt(i),
+            wind = winds.getDouble(i).roundToInt(),
+            gusts = gusts.getDouble(i).roundToInt(),
+            icon = info.second
+        )
     }
 }
 
@@ -409,19 +530,7 @@ fun buildDays(d: JSONObject): List<DailyWeather> {
     val outTime = DateTimeFormatter.ofPattern("HH:mm", Locale("ru"))
     return (0 until dates.length()).map { i ->
         val info = weatherCode(codes.getInt(i))
-        DailyWeather(
-            date = LocalDate.parse(dates.getString(i), inputDate).format(outDate),
-            min = min.getDouble(i).roundToInt(),
-            max = max.getDouble(i).roundToInt(),
-            rain = rain.optInt(i, 0),
-            wind = wind.getDouble(i).roundToInt(),
-            gusts = gusts.getDouble(i).roundToInt(),
-            uv = uv.optDouble(i, 0.0),
-            sunrise = LocalDateTime.parse(sunrise.getString(i), inputTime).format(outTime),
-            sunset = LocalDateTime.parse(sunset.getString(i), inputTime).format(outTime),
-            description = info.first,
-            icon = info.second
-        )
+        DailyWeather(LocalDate.parse(dates.getString(i), inputDate).format(outDate), min.getDouble(i).roundToInt(), max.getDouble(i).roundToInt(), rain.optInt(i, 0), wind.getDouble(i).roundToInt(), gusts.getDouble(i).roundToInt(), uv.optDouble(i, 0.0), LocalDateTime.parse(sunrise.getString(i), inputTime).format(outTime), LocalDateTime.parse(sunset.getString(i), inputTime).format(outTime), info.first, info.second)
     }
 }
 
@@ -444,12 +553,13 @@ fun download(urlString: String): String {
     } finally { c.disconnect() }
 }
 
-fun makeAdvice(current: CurrentWeather, hours: List<HourlyWeather>, air: AirQuality?): String {
+fun makeAdvice(current: CurrentWeather, hours: List<HourlyWeather>, air: AirQuality?, consensus: ForecastConsensus): String {
     val rain = hours.take(12).maxOfOrNull { it.rain } ?: 0
-    val wind = hours.take(12).maxOfOrNull { it.wind } ?: current.wind
+    val wind = hours.take(12).maxOfOrNull { it.gusts } ?: current.gusts
     val parts = mutableListOf<String>()
-    parts += when { rain >= 70 -> "Зонт лучше взять: в ближайшие часы высокая вероятность осадков до $rain%."; rain >= 40 -> "Осадки возможны, зонт не помешает."; else -> "Осадки маловероятны, день подходит для прогулок и дел на улице." }
-    if (wind >= 35) parts += "Ветер заметный, лучше выбрать более закрытую одежду."
+    parts += when { rain >= 70 -> "Зонт лучше взять: риск осадков высокий, окно риска ${consensus.rainWindow}."; rain >= 40 -> "Осадки возможны, лучше взять компактный зонт."; else -> "Осадки маловероятны, день подходит для прогулок и дел на улице." }
+    parts += "Надёжность прогноза ${consensus.confidence}%: ${consensus.agreement}."
+    if (wind >= 35) parts += "Возможны ощутимые порывы ветра, лучше выбрать закрытую одежду."
     if (current.uv >= 6.0) parts += "UV-индекс высокий: пригодятся очки и SPF."
     if ((air?.aqi ?: 0) >= 80) parts += "Качество воздуха снижено, долгие интенсивные прогулки лучше ограничить."
     return parts.joinToString(" ")
