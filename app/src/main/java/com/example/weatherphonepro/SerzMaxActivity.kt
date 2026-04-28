@@ -158,17 +158,25 @@ fun SerzMaxConnectedApp() {
                         val weather = dashboard.weather
                         val max = pack.max
                         item { SerzCompactHeroCard(weather) }
-                        item { ForecastPointCard(dashboard.point) }
                         when (selectedTab) {
                             "Главная" -> {
+                                item { SerzQuickSummaryStrip(weather, max) }
                                 item { SerzVerdictCard(max.verdict) }
                                 item { SerzActionsCard(max.actions) }
                                 item { HazardWarningsCard(max.hazards) }
+                                item { ForecastPointCard(dashboard.point) }
+                            }
+                            "Сейчас" -> {
+                                item { AdviceCard(weather.advice) }
+                                item { SerzPremiumMetricsGrid(weather) }
                                 item { HourlyComfortScaleCard(max.comfort) }
+                                item { SectionTitle("Ближайшие 24 часа") }
+                                item { HourlyRow(weather.hourly.take(24)) }
                             }
                             "Точность" -> {
                                 item { RichAccuracyCard(weather.consensus) }
                                 item { SeparateAccuracyCard(max.separateAccuracy) }
+                                item { SerzModelDisagreementCard(weather.consensus) }
                                 item { ProviderComparisonCard(dashboard.providerRows) }
                                 item { LocalAccuracyMemoryCard(dashboard.stats) }
                                 item { PaidProvidersCard() }
@@ -180,9 +188,12 @@ fun SerzMaxConnectedApp() {
                             }
                             "7 дней" -> {
                                 item { SectionTitle("Прогноз на 7 дней") }
-                                items(weather.daily) { DailyCard(it) }
+                                items(weather.daily) { SerzPremiumDailyCard(it) }
                             }
-                            "Настройки" -> item { SettingsPreviewCard(SerzSettingsStore.defaultCity(context), SerzSettingsStore.quietNight(context)) }
+                            "Настройки" -> {
+                                item { SettingsPreviewCard(SerzSettingsStore.defaultCity(context), SerzSettingsStore.quietNight(context)) }
+                                item { SerzReleaseReadyCard() }
+                            }
                         }
                         item { FooterWatermark() }
                     }
@@ -277,7 +288,7 @@ fun SerzCompactHeroCard(data: WeatherResult) {
 
 @Composable
 fun SerzMaxTabs(selected: String, onSelect: (String) -> Unit) {
-    val tabs = listOf("Главная", "Точность", "Сценарии", "Карта", "7 дней", "Настройки")
+    val tabs = listOf("Главная", "Сейчас", "Точность", "Сценарии", "Карта", "7 дней", "Настройки")
     Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         tabs.forEach { tab ->
             val active = tab == selected
