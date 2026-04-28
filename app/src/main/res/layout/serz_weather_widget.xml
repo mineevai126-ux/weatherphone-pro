@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/serz_widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@drawable/serz_widget_bg"
+    android:padding="14dp">
+
+    <TextView
+        android:id="@+id/serz_widget_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Суперпрогноз Serz"
+        android:textColor="#FFFFFF"
+        android:textStyle="bold"
+        android:textSize="16sp" />
+
+    <TextView
+        android:id="@+id/serz_widget_temp"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Откройте приложение"
+        android:textColor="#EAF7FF"
+        android:textStyle="bold"
+        android:textSize="22sp"
+        android:paddingTop="6dp" />
+
+    <TextView
+        android:id="@+id/serz_widget_note"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="точность · риск осадков · Serz"
+        android:textColor="#BDE7FF"
+        android:textSize="12sp"
+        android:paddingTop="2dp" />
+</LinearLayout>
