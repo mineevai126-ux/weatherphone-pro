@@ -2,10 +2,7 @@ package com.example.weatherphonepro
 
 import android.Manifest
 import android.app.Activity
-import android.content.Context
 import android.content.pm.PackageManager
-import android.location.Location
-import android.location.LocationManager
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -17,17 +14,23 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -42,6 +45,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
@@ -112,9 +116,13 @@ fun SerzMaxConnectedApp() {
                 scope.launch {
                     loading = true
                     error = null
-                    try { setDashboard(fetchSerzDashboardByPoint(context, "Моя точка", "GPS", location.latitude, location.longitude, "геолокация телефона")); city = "Моя точка" }
-                    catch (e: Exception) { data = null; error = e.message ?: "Не удалось загрузить прогноз по координатам" }
-                    finally { loading = false }
+                    try {
+                        setDashboard(fetchSerzDashboardByPoint(context, "Моя точка", "GPS", location.latitude, location.longitude, "геолокация телефона"))
+                        city = "Моя точка"
+                    } catch (e: Exception) {
+                        data = null
+                        error = e.message ?: "Не удалось загрузить прогноз по координатам"
+                    } finally { loading = false }
                 }
             }
 
@@ -122,12 +130,12 @@ fun SerzMaxConnectedApp() {
 
             Box(modifier = Modifier.fillMaxSize()) {
                 AnimatedWeatherBackground(data?.dashboard?.weather?.current?.code ?: 1, data?.dashboard?.weather?.current?.isDay ?: true)
-                Text("Serz", color = Color.White.copy(alpha = 0.10f), fontSize = 92.sp, fontWeight = FontWeight.ExtraBold, modifier = Modifier.align(Alignment.Center))
+                Text("Serz", color = Color.White.copy(alpha = 0.08f), fontSize = 86.sp, fontWeight = FontWeight.ExtraBold, modifier = Modifier.align(Alignment.Center))
 
-                LazyColumn(modifier = Modifier.fillMaxSize().padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                LazyColumn(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     item { SerzMaxHeader() }
                     item {
-                        SerzSearchPanel(
+                        SerzCompactSearchPanel(
                             city = city,
                             loading = loading,
                             onCityChange = { city = it },
@@ -149,7 +157,7 @@ fun SerzMaxConnectedApp() {
                         val dashboard = pack.dashboard
                         val weather = dashboard.weather
                         val max = pack.max
-                        item { HeroCard(weather) }
+                        item { SerzCompactHeroCard(weather) }
                         item { ForecastPointCard(dashboard.point) }
                         when (selectedTab) {
                             "Главная" -> {
@@ -187,10 +195,82 @@ fun SerzMaxConnectedApp() {
 @Composable
 fun SerzMaxHeader() {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        WeatherIconVector(1, modifier = Modifier.size(48.dp))
+        WeatherIconVector(1, modifier = Modifier.size(38.dp))
         Column(modifier = Modifier.padding(start = 10.dp)) {
-            Text("Суперпрогноз от Serz", color = Color.White, fontSize = 31.sp, fontWeight = FontWeight.ExtraBold)
-            Text("MAX: вывод · риски · точность · радар · виджет", color = Color.White.copy(alpha = 0.74f), fontSize = 13.sp)
+            Text("Суперпрогноз от Serz", color = Color.White, fontSize = 27.sp, fontWeight = FontWeight.ExtraBold, maxLines = 2, lineHeight = 28.sp)
+            Text("MAX · риски · точность · радар · виджет", color = Color.White.copy(alpha = 0.74f), fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+    }
+}
+
+@Composable
+fun SerzCompactSearchPanel(
+    city: String,
+    loading: Boolean,
+    onCityChange: (String) -> Unit,
+    onSearch: () -> Unit,
+    onMyWeather: () -> Unit,
+    onSaveFavorite: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(28.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.16f))
+    ) {
+        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                OutlinedTextField(
+                    value = city,
+                    onValueChange = onCityChange,
+                    label = { Text("Город") },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f)
+                )
+                Spacer(Modifier.width(8.dp))
+                Button(
+                    onClick = onSearch,
+                    enabled = !loading,
+                    shape = RoundedCornerShape(18.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF70B7FF), contentColor = Color(0xFF06111F))
+                ) { Text("Найти", fontWeight = FontWeight.Bold, fontSize = 15.sp) }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                Button(onClick = onMyWeather, enabled = !loading, shape = RoundedCornerShape(18.dp), modifier = Modifier.weight(1f)) {
+                    Text("📍 Моя", maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = 14.sp)
+                }
+                Button(onClick = onSaveFavorite, enabled = city.isNotBlank(), shape = RoundedCornerShape(18.dp), modifier = Modifier.weight(1f)) {
+                    Text("★ Сохранить", maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = 14.sp)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun SerzCompactHeroCard(data: WeatherResult) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(30.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.16f))
+    ) {
+        Column(modifier = Modifier.padding(18.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("${data.city}, ${data.country}", color = Color.White, fontSize = 25.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(data.current.description, color = Color.White.copy(alpha = 0.80f), fontSize = 17.sp, maxLines = 1)
+                    Text("${data.consensus.providerCount} источника · точность ${data.consensus.confidence}%", color = Color.White.copy(alpha = 0.62f), fontSize = 12.sp, maxLines = 1)
+                }
+                WeatherIconVector(data.current.code, modifier = Modifier.size(72.dp))
+            }
+            Spacer(Modifier.height(12.dp))
+            Row(verticalAlignment = Alignment.Bottom) {
+                Text("${data.current.temp}°", color = Color.White, fontSize = 68.sp, fontWeight = FontWeight.ExtraBold)
+                Spacer(Modifier.width(12.dp))
+                Column(modifier = Modifier.padding(bottom = 10.dp)) {
+                    Text("ощущается ${data.current.feels}°", color = Color.White.copy(alpha = 0.84f), fontSize = 16.sp)
+                    Text("ветер ${data.current.wind}, порывы ${data.current.gusts} км/ч", color = Color.White.copy(alpha = 0.72f), fontSize = 13.sp, maxLines = 1)
+                }
+            }
         }
     }
 }
@@ -208,7 +288,7 @@ fun SerzMaxTabs(selected: String, onSelect: (String) -> Unit) {
                     containerColor = if (active) Color(0xFFEFF6FF) else Color.White.copy(alpha = 0.18f),
                     contentColor = if (active) Color(0xFF0F3B66) else Color.White
                 )
-            ) { Text(tab, fontWeight = FontWeight.Bold) }
+            ) { Text(tab, fontWeight = FontWeight.Bold, maxLines = 1) }
         }
     }
 }
